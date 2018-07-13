@@ -7,6 +7,7 @@
   需要将 node_modules中 next package中的_app.js , _document.js, _error.js复制到 pages中
 
 问题2. nextJS项目前缀
+  场景：同一个地址下配置多个nextJS项目。
   在next.config.js 中配置：
    （例）
     const isProd = process.env.NODE_ENV === 'production'
