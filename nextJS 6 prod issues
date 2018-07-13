@@ -1,0 +1,79 @@
+项目生产中 nextJS 6 打包发布遇到的问题：
+
+打包发布流程
+本地开发 -> 测试服务器构建 -> 同步正式服务器 
+
+问题1. 文件依赖 _app.js, _error.js 路径找不到
+  需要将 node_modules中 next package中的_app.js , _document.js, _error.js复制到 pages中
+
+问题2. nextJS项目前缀
+  在next.config.js 中配置：
+   （例）
+    const isProd = process.env.NODE_ENV === 'production'
+    modules.exports = {
+      assetPrefix: isProd ? '/manage' : '',
+    }
+
+问题3. nextJS 6 中样式使用less打包，丢失样式问题
+  在version 6.0.0 以后使用less会出现此问题， 5.*.* 版本没有该问题。
+  问题原因：是nextJS 6版本打包将style.css打包成多个文件造成样式覆盖。
+  解决方式：
+    配置next.config.js
+    如下：
+      // next.config.js
+const webpack = require('webpack')
+const path = require('path');
+const withLess = require('@zeit/next-less')
+
+// eslint-disable-next-line import/no-extraneous-dependencies
+const commonsChunkConfig = (config, test = /\.css$/) => {
+  config.plugins = config.plugins.map(plugin => {
+    if (
+      plugin.constructor.name === 'CommonsChunkPlugin' &&
+      // disable filenameTemplate checks here because they never match
+      // (plugin.filenameTemplate === 'commons.js' ||
+      //     plugin.filenameTemplate === 'main.js')
+      // do check for minChunks though, because this has to (should?) exist
+      plugin.minChunks != null
+    ) {
+      const defaultMinChunks = plugin.minChunks;
+      plugin.minChunks = (module, count) => {
+        if (module.resource && module.resource.match(test)) {
+          return true;
+        }
+        return defaultMinChunks(module, count);
+      };
+    }
+    return plugin;
+  });
+  return config;
+};
+
+const isProd = process.env.NODE_ENV === 'production'
+
+module.exports = withLess({
+  assetPrefix: isProd ? '/manage' : '',
+  cssModules: true,
+  cssLoaderOptions: {
+    importLoaders: 1,
+    localIdentName: "[local]__[hash:base64:8]",
+    includePaths: ['styles'].map(d => path.join(__dirname, d)),
+  },
+  // useFileSystemPublicRoutes: false,
+  distDir: 'build',
+
+  webpack: config => {
+    let newConfig = { ...config };
+    newConfig = commonsChunkConfig(newConfig, /\.(less|css)$/);
+    newConfig.plugins.push(
+      new webpack.IgnorePlugin(/^\.\/locale$/, /moment$/),
+    );
+    return newConfig;
+  },
+})
+
+
+
+  
+  
+  
